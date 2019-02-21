@@ -1,0 +1,416 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+        DonorsChoose.org is a United States–based 501 nonprofit organization that allows individuals to donate directly to public school classroom projects. Founded in 2000 by former public school teacher Charles Best, DonorsChoose.org was among the first civic crowdfunding platforms of its kind. The organization has been given Charity Navigator’s highest rating every year since 2005. In January 2018, they announced that 1 million projects had been funded.
+        In 77% of public schools in the United States, at least one project has been requested on DonorsChoose.org. Schools from wealthy areas are more likely to make technology requests, while schools from less affluent areas are more likely to request basic supplies. It's been noted that repeat donors on DonorsChoose typically donate to projects they have no prior relationship with, and most often fund projects serving financially challenged students.
+        
+        
+        
+## About this kernel        
+```{r}
+
+I will be covering my analysis and approach through different process flows in the data science pipeline, which includes statistical inference and exploratory data analysis. The main goal is to understand the reasoning behind employee turnover and to come up with a model to classify an employee’s risk of attrition. A recommendation for a retention plan was created, which incorporates some best practices for employee retention at different risk levels of attrition.
+
+Hopefully the kernel added some new insights/perspectives to the data science community! If there are any suggestions/changes you would like to see in the Kernel please let me know :). Appreciate every ounce of help!
+
+This notebook will always be a work in progress. Please leave any comments about further improvements to the notebook! Any feedback or constructive criticism is greatly appreciated!. Thank you guys!
+  
+```
+        
+Part - 1 Loading Libraries
+```{r}
+library(readr)
+library(tidyverse)
+library(plotly)
+library(dplyr)
+library(ggplot2)
+```
+
+Part-2 Obtaining Data
+```{r}
+
+
+resources <- read_csv("resources.csv")
+train <- read_csv("train.csv")
+test <- read_csv("test.csv")
+sample_submission <- read_csv("sample_submission.csv")
+
+```
+
+Part -3  Data Exploration
+```{r}
+summary(train)
+summary(test)
+summary(resources)
+summary(sample_submission)
+
+
+
+```
+
+```{r}
+
+glimpse(train)
+glimpse(test)
+glimpse(resources)
+glimpse(sample_submission)
+
+```
+
+##Conversion
+```{r}
+
+as.factor(train$id) <- train$id
+as.factor(train$teacher_id) <- train$teacher_id
+as.factor(train$teacher_prefix) <- train$teacher_prefix
+as.factor(train$school_state) <- train$school_state
+as.factor(train$project_grade_category) <- train$project_grade_category
+as.factor(train$project_subject_categories) <- train$project_subject_categories
+as.factor(train$project_subject_subcategories) <- train$project_subject_subcategories
+as.factor(train$project_title) <- train$project_title
+as.factor(train$project_essay_1) <- train$project_essay_1
+as.factor(train$project_essay_2) <- train$project_essay_2
+as.factor(train$project_essay_3) <- train$project_essay_3
+as.factor(train$project_essay_4) <- train$project_essay_4
+as.factor(train$project_resource_summary) <- train$project_resource_summary
+
+
+
+as.factor(test$id) <- test$id
+as.factor(test$teacher_id) <- test$teacher_id
+as.factor(test$teacher_prefix) <- test$teacher_prefix
+as.factor(test$school_state) <- test$school_state
+as.factor(test$project_grade_category) <- test$project_grade_category
+as.factor(test$project_subject_categories) <- test$project_subject_categories
+as.factor(test$project_subject_subcategories) <- test$project_subject_subcategories
+as.factor(test$project_title) <- test$project_title
+as.factor(test$project_essay_1) <- test$project_essay_1
+as.factor(test$project_essay_2) <- test$project_essay_2
+as.factor(test$project_essay_3) <- test$project_essay_3
+as.factor(test$project_essay_4) <- test$project_essay_4
+as.factor(test$project_resource_summary) <- test$project_resource_summary
+
+
+as.factor(resources$id) <- resources$id
+as.factor(resources$description) <- resources$description
+
+
+```
+
+## Sample data
+```{r}
+head(train)
+
+head(resources)
+
+```
+
+## Stastical Overview
+
+ The dataset has
+ * About 182080 unique project application and 16 features
+ * A whooping 85 % of the proposals got sanctioned.
+
+
+```{r}
+dim(train)
+
+perc_approved <- sum(train$project_is_approved/length(train$project_is_approved))*100
+perc_approved
+
+```
+## Distribution plots
+
+
+Summary: Let us examine the features of resources to start with.Note that i took log values to depict the plots.
+
+- Quantity - There is a higher spike at low quantity 
+
+- Price - It seems to have a normal curve
+
+- Number of Previous projects - There is a significant right skewness to this data.
+
+```{r}
+
+par(mfrow=c(1,3))
+hist(log(resources$quantity), col="green")
+hist(log(resources$price), col="red")
+hist(log(train$teacher_number_of_previously_posted_projects), col = "blue")
+
+
+
+```
+
+## Teacher
+
+
+```{r}
+
+
+p1 <- train %>%
+  count(teacher_id) %>%
+  ggplot(aes(n)) +
+  geom_bar(fill = "Dark Green") +
+  scale_y_log10() +
+  labs(x = "Number of Proposals per Teacher ID") +
+  ggtitle("Teacher Characteristics")
+p1
+```
+
+
+
+
+```{r}
+train %>%
+  ggplot(aes(teacher_number_of_previously_posted_projects)) +
+  geom_histogram(bins = 100, fill = "Red") +
+  labs(x = "Number of previous Proposals per Teacher ID") +
+  scale_y_log10()
+
+```
+
+```{r}
+ggplot(join_train, aes(x = log10(teacher_number_of_previously_posted_projects), fill = as.factor(project_is_approved))) +
+      geom_density(alpha = 0.4)  + 
+      ggtitle("") 
+
+```
+
+```{r}
+join_train %>%
+  ggplot(aes(price)) +
+  geom_histogram(bins = 100, fill = "Blue") +
+  labs(x = "Price of resources") +
+  scale_y_log10()
+
+```
+
+
+```{r}
+ggplot(join_train, aes(x = log10(price), fill = as.factor(project_is_approved))) +
+      geom_density(alpha = 0.4)  + 
+      ggtitle("") 
+```
+
+
+```{r}
+
+library(plotly)
+df <- join_train
+df$hover <- with(df, paste(school_state, '<br>', "project_is_approved", project_is_approved))
+# give state boundaries a white border
+l <- list(color = toRGB("white"), width = 2)
+# specify some map projection/options
+g <- list(
+  scope = 'usa',
+  projection = list(type = 'albers usa'),
+  showlakes = TRUE,
+  lakecolor = toRGB('white')
+)
+
+p <- plot_geo(df, locationmode = 'USA-states') %>%
+  add_trace(
+    z = ~price, text = ~hover, locations = ~school_state,
+    color = ~price, colors = 'Purples'
+  ) %>%
+  colorbar(title = "Millions USD") %>%
+  layout(
+    title = 'Project proposals in U.S)',
+    geo = g
+  )
+p
+
+```
+
+
+```{r}
+
+vis_1<-table(train$teacher_prefix,train$project_is_approved)
+#print(vis_1)
+d_vis_1<-as.data.frame(vis_1)
+print(d_vis_1)
+library(ggplot2)
+p<-ggplot(d_vis_1, aes(x=Var1,y=Freq,fill=Var2)) +
+ geom_bar(position="dodge",stat='identity') + coord_flip()
+
+print(p)
+```
+
+
+```{r}
+vis_2<-table(train$project_grade_category,train$project_is_approved)
+d_vis_2<-as.data.frame(vis_2)
+d_vis_2<-subset(d_vis_2,Var2==0)
+#print(d_vis_2)
+library(ggplot2)
+d_vis_2$Var1 <- factor(d_vis_2$Var1, levels = d_vis_2$Var1[order(-d_vis_2$Freq)])
+p<-ggplot(d_vis_2, aes(x=Var1,y=Freq,fill=Var1)) +
+ geom_bar(stat='identity') +theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+print(p)
+```
+
+```{r}
+x<- data.frame(table(train$project_subject_subcategories[train$project_is_approved == "1"]) )
+k<- data.frame(table(train$project_subject_subcategories))
+project_subject <- merge(x,k,by = "Var1")
+
+
+project_Subject <- project_subject$Var1
+
+text <- round( (project_subject$Freq.x/ project_subject$Freq.y)*100,digits = 2)
+text <- paste(text, "%Accepted" )
+
+data <- data.frame(project_Subject, project_subject$Freq.x, project_subject$Freq.y - project_subject$Freq.x)
+
+p <- plot_ly(data, x = ~project_Subject, y = ~project_subject$Freq.x, type = 'bar', text = text ,name = 'Accepted') %>%
+  add_trace(y = ~project_subject$Freq.y - project_subject$Freq.x, name = 'Not Accepted') %>%
+  layout(margin = list(b = 160),yaxis = list(title = 'Count'), barmode = 'stack')
+p
+
+```
+
+
+```{r}
+head(train)
+head(resources)
+
+```
+
+
+
+```{r}
+join_train <- merge(train,resources,by = "id")
+approved_data <-subset(join_train,project_is_approved==1)
+non_approved_data <-subset(join_train,project_is_approved==0)
+ggplot() + geom_density(aes(x=log(teacher_number_of_previously_posted_projects)), colour="red", data=approved_data) + 
+  geom_density(aes(x=log(teacher_number_of_previously_posted_projects)), colour="blue", data=non_approved_data)
+
+```
+
+```{r}
+
+
+
+ggplot(join_train, aes(x = log10(teacher_number_of_previously_posted_projects), fill = as.factor(project_is_approved))) +
+      geom_density(alpha = 0.4)  + 
+      ggtitle("Density Plot of PresentExperience related to Attrition") 
+```
+
+
+```{r}
+
+
+ggplot() + geom_density(aes(x=log(price)), colour="red", data=approved_data) + 
+  geom_density(aes(x=log(price)), colour="blue", data=non_approved_data)
+
+```
+
+```{r}
+ggplot() + geom_density(aes(x=log(quantity)), colour="red", data=approved_data) + 
+  geom_density(aes(x=log(quantity)), colour="blue", data=non_approved_data)
+```
+
+```{r}
+join_train %>%
+  group_by(project_subject_categories) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count)) %>%
+  ungroup() %>% 
+  mutate(project_subject_categories = reorder(project_subject_categories,Count)) %>%
+  head(10) %>%
+    
+ ggplot(aes(x = project_subject_categories,y = Count)) +
+  geom_bar(stat='identity',colour="white",fill = "orange") +
+  geom_text(aes(x = project_subject_categories, y = 1, label = paste0("(",Count,")",sep="")),
+            hjust=0, vjust=.5, size = 4, colour = 'black',
+            fontface = 'bold') +
+  labs(x = 'project_subject_categories', 
+       y = 'Count' 
+       ) + coord_flip() +
+ 
+   theme_light()
+
+```
+
+```{r}
+join_train %>%
+  group_by(project_subject_subcategories) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count)) %>%
+  ungroup() %>% 
+  mutate(project_subject_subcategories = reorder(project_subject_subcategories,Count)) %>%
+  head(10) %>%
+    
+ ggplot(aes(x = project_subject_subcategories,y = Count)) +
+  geom_bar(stat='identity',colour="white",fill = "light blue") +
+  geom_text(aes(x = project_subject_subcategories, y = 1, label = paste0("(",Count,")",sep="")),
+            hjust=0, vjust=.5, size = 4, colour = 'black',
+            fontface = 'bold') +
+  labs(x = 'project_subject_subcategories', 
+       y = 'Count' 
+       ) + coord_flip() +
+ 
+   theme_light()
+```
+```{r}
+train$Gender <- "Unknown"
+train$Gender [(train$teacher_prefix == "Ms."|train$teacher_prefix == "Mrs.")]  <- "Female"
+train$Gender [(train$teacher_prefix == "Mr.")]  <- "Male"
+
+
+```
+
+```{r}
+train %>%
+  count(Gender) %>%
+  top_n(10, n) %>%
+  ggplot(aes(reorder(Gender, n, FUN = min), n, fill = Gender)) +
+  geom_col() +
+  labs(x = "Subject Sub-Categories") +
+ 
+  theme(legend.position = "none")
+```
+
+
+```{r}
+x<- data.frame(table(train$Gender[train$project_is_approved == "1"]) )
+k<- data.frame(table(train$Gender))
+gender <- merge(x,k,by = "Var1")
+
+
+Gender <- gender$Var1
+
+text <- round( (gender$Freq.x/ gender$Freq.y)*100,digits = 2)
+text <- paste(text, "%Accepted" )
+
+data <- data.frame(Gender, gender$Freq.x, gender$Freq.y - gender$Freq.x)
+
+p <- plot_ly(data, x = ~Gender, y = ~gender$Freq.x, type = 'bar', text = text ,name = 'Accepted') %>%
+  add_trace(y = ~gender$Freq.y - gender$Freq.x, name = 'Not Accepted') %>%
+  layout(yaxis = list(title = 'Count'), barmode = 'stack')
+p
+```
+
+
+
+```{r}
+x<- colMeans(is.na(train) )
+distribution<- x[x>0]
+t<-data.frame(distribution)
+
+ colnames(t) <- "Percentage"
+
+
+
+require('DT')
+    d = data.frame(
+      t,
+      stringsAsFactors = TRUE
+    )
+    dt <- datatable(d, filter = 'bottom', options = list(pageLength = 5))
+    dt
+```
+
